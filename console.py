@@ -9,51 +9,42 @@ bot = Bot(token=TOKEN)
 async def send(uid, msg):
     await bot.send_message(chat_id=uid, text=msg)
 
-def menu():
-    print("""
-💀 KHASAM MP PANEL
+def seleccionar_usuario():
+    users = get_users()
 
-Comandos:
-1 → users
-2 → select <id>
-3 → msg <texto>
-4 → exit
-""")
+    print("\n👥 Usuarios disponibles:")
+    for uid, name in users.items():
+        print(f"{uid} → {name}")
 
-async def main():
+    uid = input("\n🎯 Escribe el ID del usuario: ")
+
+    if uid in users:
+        chat_activo["user_id"] = int(uid)
+        chat_activo["username"] = users[uid]
+        print(f"\n💬 Chat activo con: {users[uid]}")
+    else:
+        print("❌ Usuario no encontrado")
+        seleccionar_usuario()
+
+async def chat():
     while True:
-        menu()
-        cmd = input(">> ")
+        msg = input("\n>> ")
 
-        if cmd == "users":
-            users = get_users()
-            for uid, name in users.items():
-                print(f"{uid} → {name}")
-
-        elif cmd.startswith("select"):
-            _, uid = cmd.split()
-            users = get_users()
-
-            if uid in users:
-                chat_activo["user_id"] = int(uid)
-                chat_activo["username"] = users[uid]
-                print(f"🎯 Seleccionado: {users[uid]}")
-            else:
-                print("❌ No existe")
-
-        elif cmd.startswith("msg"):
-            if not chat_activo["user_id"]:
-                print("⚠️ Selecciona usuario primero")
-                continue
-
-            mensaje = cmd.replace("msg ", "")
-            await send(chat_activo["user_id"], mensaje)
-
-        elif cmd == "exit":
+        if msg == "/exit":
+            print("👋 Saliendo...")
             break
 
-        else:
-            print("❌ Comando inválido")
+        if not chat_activo["user_id"]:
+            print("⚠️ No hay usuario seleccionado")
+            continue
+
+        await send(chat_activo["user_id"], msg)
+
+async def main():
+    print("💀 KHASAM MP CHAT")
+
+    seleccionar_usuario()
+    await chat()
 
 if __name__ == "__main__":
     asyncio.run(main())
