@@ -6,17 +6,22 @@ FILE = "data/logs.json"
 def log(user, msg):
     os.makedirs("data", exist_ok=True)
 
-    data = []
-    if os.path.exists(FILE):
-        data = json.load(open(FILE))
+    try:
+        data = []
+        if os.path.exists(FILE):
+            with open(FILE, "r") as f:
+                data = json.load(f)
 
-    entry = {
-        "user": user,
-        "msg": msg,
-        "time": datetime.now().strftime("%H:%M:%S")
-    }
+        entry = {
+            "user": user,
+            "msg": msg,
+            "time": datetime.now().strftime("%H:%M:%S")
+        }
 
-    data.append(entry)
-    json.dump(data, open(FILE, "w"), indent=4)
+        data.append(entry)
 
-    print(f"\n[{entry['time']}] 💬 {user}: {msg}")
+        with open(FILE, "w") as f:
+            json.dump(data, f, indent=4)
+
+    except Exception as e:
+        print("❌ Error guardando log:", e)
