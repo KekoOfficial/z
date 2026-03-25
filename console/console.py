@@ -3,14 +3,11 @@ import json
 import asyncio
 from telegram import Bot
 
-# 🔑 Token del bot
 TOKEN = "8367475601:AAFt-z2bWkFY4W4ReGGVxKSkKtyWr4DkAUY"
-
-# Carpeta compartida con bot.py
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
 HISTORIAL_FILE = os.path.join(DATA_DIR, "historial.json")
 
-# Función para leer historial
+# Leer historial
 def leer_historial(uid=None, last_n=10):
     if not os.path.exists(HISTORIAL_FILE):
         return []
@@ -20,7 +17,7 @@ def leer_historial(uid=None, last_n=10):
         historial = [m for m in historial if m["uid"] == uid]
     return historial[-last_n:]
 
-# Función para enviar mensaje a usuario
+# Enviar mensaje a usuario
 async def enviar_msg(bot, uid, mensaje):
     try:
         await bot.send_message(chat_id=uid, text=mensaje)
@@ -28,23 +25,29 @@ async def enviar_msg(bot, uid, mensaje):
     except Exception as e:
         print(f"❌ Error enviando mensaje: {e}")
 
-# Consola interactiva
+# Consola interactiva estilo chat
 async def consola():
     bot = Bot(token=TOKEN)
     print("💀 PANEL ADMIN ACTIVO")
     print("Comandos:")
     print("users -> últimos usuarios")
     print("hist <uid> -> últimos mensajes")
-    print("<uid> <mensaje> -> enviar mensaje directo")
-    print("exit -> salir\n")
+    print("exit -> salir del panel\n")
 
     loop = asyncio.get_event_loop()
+    chat_uid = None  # Usuario actualmente seleccionado
+    usuarios_lista = []
+
     while True:
-        cmd = await loop.run_in_executor(None, input, ">> ")
+        if chat_uid:
+            prompt = f"[Chat con {chat_uid}] >> "
+        else:
+            prompt = ">> "
+        cmd = await loop.run_in_executor(None, input, prompt)
         if not cmd:
             continue
 
-        # Salir
+        # Salir del panel
         if cmd.lower() == "exit":
             break
 
@@ -54,11 +57,12 @@ async def consola():
             usuarios = {}
             for m in historial:
                 usuarios[m["uid"]] = m["user"]
+            usuarios_lista = list(usuarios.items())
             print("👥 Usuarios recientes:")
-            for uid, name in usuarios.items():
-                print(f"{uid} → {name}")
+            for idx, (uid, name) in enumerate(usuarios_lista, start=1):
+                print(f"{idx} {uid} → {name}")
 
-        # Mostrar historial de un usuario
+        # Ver historial de un usuario
         elif cmd.lower().startswith("hist"):
             partes = cmd.split()
             if len(partes) < 2:
@@ -70,18 +74,26 @@ async def consola():
             for m in msgs:
                 print(f"{m['time']} | {m['user']} → {m['msg']} ({m['tipo']})")
 
-        # Enviar mensaje directo a ID
-        elif cmd[0].isdigit():
-            partes = cmd.split()
-            uid = int(partes[0])
-            mensaje = " ".join(partes[1:])
-            if not mensaje:
-                print("⚠️ Escribe un mensaje después del ID")
-                continue
-            await enviar_msg(bot, uid, mensaje)
+        # Seleccionar usuario por número de lista
+        elif cmd.isdigit() and usuarios_lista:
+            idx = int(cmd) - 1
+            if 0 <= idx < len(usuarios_lista):
+                chat_uid = usuarios_lista[idx][0]
+                print(f"💬 Chat seleccionado con {usuarios_lista[idx][1]} ({chat_uid})")
+            else:
+                print("⚠️ Número inválido")
+
+        # Salir del chat actual
+        elif cmd == ".e":
+            chat_uid = None
+            print("🔹 Saliste del chat actual")
+
+        # Enviar mensaje al usuario seleccionado
+        elif chat_uid:
+            await enviar_msg(bot, chat_uid, cmd)
 
         else:
-            print("⚠️ Comando no reconocido")
+            print("⚠️ Comando no reconocido. Usa 'users' para ver lista de usuarios o 'exit' para salir")
 
 if __name__ == "__main__":
     asyncio.run(consola())
