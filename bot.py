@@ -5,7 +5,7 @@ from datetime import datetime
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters
 
-TOKEN = "TU_TOKEN_AQUI"
+TOKEN = "8367475601:AAFt-z2bWkFY4W4ReGGVxKSkKtyWr4DkAUY"
 
 # Carpeta para historial
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
