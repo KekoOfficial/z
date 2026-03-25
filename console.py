@@ -3,7 +3,7 @@ from telegram import Bot
 from core.state import chat_activo
 from core.users import get_users
 
-TOKEN = "TU_TOKEN"
+TOKEN = "8367475601:AAFt-z2bWkFY4W4ReGGVxKSkKtyWr4DkAUY"
 bot = Bot(token=TOKEN)
 
 async def send(uid, msg):
