@@ -5,7 +5,7 @@ from core.users import save_user
 from core.logs import log
 from core.state import chat_activo
 
-TOKEN = "TU_TOKEN_AQUI"
+TOKEN = "8367475601:AAFt-z2bWkFY4W4ReGGVxKSkKtyWr4DkAUY"
 
 # 🔥 detectar tipo de mensaje
 def detectar_contenido(msg):
