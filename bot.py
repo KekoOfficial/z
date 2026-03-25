@@ -1,97 +1,108 @@
 import json
+import os
+import asyncio
 from datetime import datetime
-from threading import Thread
-from telegram import Update, Bot
-from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
+from telegram import Update
+from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters, CommandHandler
 
-HISTORIAL_FILE = "data/historial.json"
-TOKEN = "8367475601:AAFt-z2bWkFY4W4ReGGVxKSkKtyWr4DkAUY"
+# --- Config ---
+TOKEN = "TU_TOKEN_AQUI"
+DATA_FILE = "data/historial.json"
 
-# Cargar historial
-def cargar_historial():
-    try:
-        with open(HISTORIAL_FILE, "r") as f:
-            return json.load(f)
-    except:
-        return {}
+# --- Inicializa historial ---
+if not os.path.exists("data"):
+    os.makedirs("data")
 
-def guardar_historial(historial):
-    with open(HISTORIAL_FILE, "w") as f:
+if os.path.exists(DATA_FILE):
+    with open(DATA_FILE, "r") as f:
+        historial = json.load(f)
+else:
+    historial = {}
+
+# --- Guardar historial ---
+def guardar_historial():
+    with open(DATA_FILE, "w") as f:
         json.dump(historial, f, indent=4)
 
-historial = cargar_historial()
-bot = Bot(TOKEN)
-
-# Recibir mensajes
+# --- Manejar mensajes recibidos ---
 async def mensaje_recibido(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.message.chat_id)
-    text = update.message.text
-    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    user_id = str(update.message.from_user.id)
+    mensaje = update.message.text
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     if user_id not in historial:
         historial[user_id] = []
-    historial[user_id].append({"ts": ts, "from": "user", "text": text})
-    guardar_historial(historial)
 
-    print(f"\n📩 {ts} | {user_id} → {text}\n>> ", end="")
+    historial[user_id].append({
+        "timestamp": timestamp,
+        "from": update.message.from_user.username or str(user_id),
+        "message": mensaje
+    })
 
-# Consola para enviar mensajes
-def consola():
-    global historial
-    chat_seleccionado = None
+    guardar_historial()
+    print(f"\n📥 Mensaje de {user_id}: {mensaje}\n>> ", end="", flush=True)
+
+# --- Consola para enviar mensajes ---
+async def consola(app):
+    seleccionado = None
 
     while True:
-        cmd = input(">> ").strip()
+        comando = input(">> ").strip()
 
-        if cmd == "users":
-            print("👥 Usuarios:")
+        if comando.lower() == "users":
+            print("👥 Usuarios disponibles:")
             for i, uid in enumerate(historial.keys(), 1):
                 print(f"{i} → {uid}")
-
-        elif cmd.startswith("select"):
-            parts = cmd.split()
-            if len(parts) == 2 and parts[1].isdigit():
-                idx = int(parts[1]) - 1
-                usuarios = list(historial.keys())
-                if 0 <= idx < len(usuarios):
-                    chat_seleccionado = usuarios[idx]
-                    print(f"✅ Chat seleccionado: {chat_seleccionado}")
-                else:
-                    print("❌ Índice inválido")
-            else:
+        elif comando.startswith("select"):
+            try:
+                idx = int(comando.split()[1]) - 1
+                seleccionado = list(historial.keys())[idx]
+                print(f"✅ Chat seleccionado: {seleccionado}")
+            except:
+                print("❌ ID inválido")
+        elif comando.startswith("hist"):
+            try:
+                uid = comando.split()[1]
+                print(f"📜 Historial de {uid}:")
+                for m in historial.get(uid, []):
+                    print(f"{m['timestamp']} | {m['from']} → {m['message']}")
+            except:
                 print("❌ Comando inválido")
+        elif comando.lower() in ["exit", ".e"]:
+            print("Saliendo de consola...")
+            break
+        elif seleccionado:
+            mensaje = comando
+            await app.bot.send_message(chat_id=int(seleccionado), text=mensaje)
 
-        elif cmd.startswith("hist"):
-            parts = cmd.split()
-            if len(parts) == 2:
-                uid = parts[1]
-                if uid in historial:
-                    print(f"📜 Últimos mensajes de {uid}:")
-                    for msg in historial[uid]:
-                        print(f"{msg['ts']} | {msg['from']} → {msg['text']}")
-                else:
-                    print("❌ Usuario no encontrado")
-            else:
-                print("❌ Comando inválido")
-
-        elif chat_seleccionado:
-            text = cmd
-            bot.send_message(chat_id=chat_seleccionado, text=text)
-            historial[chat_seleccionado].append({"ts": "Ahora", "from": "me", "text": text})
-            guardar_historial(historial)
-            print(f"✅ Mensaje enviado a {chat_seleccionado}: {text}")
-
+            # Guardar en historial
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            historial[seleccionado].append({
+                "timestamp": timestamp,
+                "from": "BOT",
+                "message": mensaje
+            })
+            guardar_historial()
+            print(f"✅ Mensaje enviado a {seleccionado}: {mensaje}")
         else:
             print("❌ Selecciona un chat primero con: select <número>")
 
-# Iniciar bot y consola en paralelo
-app = ApplicationBuilder().token(TOKEN).build()
-app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), mensaje_recibido))
+# --- Ejecutar bot ---
+async def main():
+    app = ApplicationBuilder().token(TOKEN).build()
 
-print("💀 BOT ACTIVADO")
+    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), mensaje_recibido))
 
-# Hilo de consola
-Thread(target=consola, daemon=True).start()
+    # Correr consola y bot al mismo tiempo
+    await asyncio.gather(
+        app.start(),
+        consola(app)
+    )
 
-# Ejecutar bot
-app.run_polling(drop_pending_updates=True)
+    await app.stop()
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\nBot detenido.")
