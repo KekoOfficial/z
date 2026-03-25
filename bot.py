@@ -1,32 +1,76 @@
+import os
+import json
+from datetime import datetime
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
 
-from core.users import save_user
-from core.logs import log
-from core.state import chat_activo
-
+# 🔑 Token
 TOKEN = "8367475601:AAFt-z2bWkFY4W4ReGGVxKSkKtyWr4DkAUY"
 
-# 🔥 detectar tipo de mensaje
+# Carpeta y archivo de historial
+DATA_DIR = "data"
+HISTORIAL_FILE = os.path.join(DATA_DIR, "historial.json")
+os.makedirs(DATA_DIR, exist_ok=True)
+
+# Chat activo
+chat_activo = {}
+
+# Guardar historial
+def guardar_historial(user, uid, contenido, tipo):
+    historial = []
+    if os.path.exists(HISTORIAL_FILE):
+        with open(HISTORIAL_FILE, "r") as f:
+            historial = json.load(f)
+
+    entrada = {
+        "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "user": user,
+        "uid": uid,
+        "tipo": tipo,
+        "msg": contenido
+    }
+
+    historial.append(entrada)
+
+    with open(HISTORIAL_FILE, "w") as f:
+        json.dump(historial, f, indent=4)
+
+# Recuperar historial por usuario
+def leer_historial(uid=None, last_n=10):
+    if not os.path.exists(HISTORIAL_FILE):
+        print("⚠️ No hay historial aún")
+        return []
+
+    with open(HISTORIAL_FILE, "r") as f:
+        historial = json.load(f)
+
+    # Filtrar por UID si se indica
+    if uid:
+        historial = [m for m in historial if m["uid"] == uid]
+
+    # Últimos mensajes
+    return historial[-last_n:]
+
+# Detectar tipo de mensaje
 def detectar_contenido(msg):
     if msg.text:
-        return msg.text
+        return msg.text, "texto"
     elif msg.photo:
-        return "📷 Foto"
+        return "📷 Foto", "foto"
     elif msg.video:
-        return "🎬 Video"
+        return "🎬 Video", "video"
     elif msg.audio:
-        return "🎵 Audio"
+        return "🎵 Audio", "audio"
     elif msg.voice:
-        return "🎤 Voz"
+        return "🎤 Voz", "voz"
     elif msg.document:
-        return "📄 Archivo"
+        return "📄 Archivo", "archivo"
     elif msg.sticker:
-        return "😂 Sticker"
+        return "😂 Sticker", "sticker"
     else:
-        return "📦 Otro"
+        return "📦 Otro tipo", "otro"
 
-# 💬 recibir mensajes
+# Recibir mensajes
 async def recibir(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
         return
@@ -35,30 +79,31 @@ async def recibir(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = user.id
     name = user.username or user.first_name
 
-    contenido = detectar_contenido(update.message)
+    contenido, tipo = detectar_contenido(update.message)
 
-    # guardar datos
-    save_user(uid, name)
-    log(name, contenido)
+    # Guardar en historial
+    guardar_historial(name, uid, contenido, tipo)
 
-    # actualizar chat activo
+    # Mostrar en consola
+    print(f"\n💀 [{name}] ({uid}) → {contenido} ({tipo})")
+
+    # Actualizar chat activo
     chat_activo["user_id"] = uid
     chat_activo["username"] = name
 
-    # mostrar en consola PRO
-    print(f"\n💀 [{name}] ({uid}) → {contenido}")
+    # Confirmar al usuario
+    await update.message.reply_text("📩 Recibido y guardado en historial")
 
-    await update.message.reply_text("📩 Recibido")
-
-# 🚀 iniciar bot
+# Iniciar bot
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
-
-    # 🔥 capturar TODO
     app.add_handler(MessageHandler(filters.ALL, recibir))
 
-    print("💀 BOT MP ACTIVO (Nivel Khasam)")
-    app.run_polling()
+    print("💀 BOT MP ACTIVO CON HISTORIAL")
+    try:
+        app.run_polling(drop_pending_updates=True)
+    except Exception as e:
+        print("❌ Error:", e)
 
 if __name__ == "__main__":
     main()
