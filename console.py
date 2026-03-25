@@ -6,17 +6,28 @@ from core.users import get_users
 TOKEN = "8367475601:AAFt-z2bWkFY4W4ReGGVxKSkKtyWr4DkAUY"
 bot = Bot(token=TOKEN)
 
+# 🚀 enviar mensaje
 async def send(uid, msg):
-    await bot.send_message(chat_id=uid, text=msg)
+    try:
+        await bot.send_message(chat_id=uid, text=msg)
+        print(f"✅ Enviado → {msg}")
+    except Exception as e:
+        print(f"❌ Error: {e}")
 
-def seleccionar_usuario():
+# 👥 mostrar usuarios
+def mostrar_usuarios():
     users = get_users()
 
-    print("\n👥 Usuarios disponibles:")
+    print("\n👥 LISTA DE USUARIOS:")
     for uid, name in users.items():
         print(f"{uid} → {name}")
 
-    uid = input("\n🎯 Escribe el ID del usuario: ")
+    if not users:
+        print("⚠️ No hay usuarios aún")
+
+# 🎯 seleccionar usuario
+def seleccionar(uid):
+    users = get_users()
 
     if uid in users:
         chat_activo["user_id"] = int(uid)
@@ -24,27 +35,70 @@ def seleccionar_usuario():
         print(f"\n💬 Chat activo con: {users[uid]}")
     else:
         print("❌ Usuario no encontrado")
-        seleccionar_usuario()
 
-async def chat():
+# 🧠 panel principal
+async def main():
+    print("""
+💀 KHASAM MP CONSOLE
+
+Comandos:
+users → ver usuarios
+select <id> → elegir usuario
+exit → salir
+
+Modo rápido:
+<ID> mensaje
+
+Modo chat:
+(escribe directo después de seleccionar)
+""")
+
     while True:
-        msg = input("\n>> ")
+        cmd = input("\n>> ")
 
-        if msg == "/exit":
-            print("👋 Saliendo...")
-            break
-
-        if not chat_activo["user_id"]:
-            print("⚠️ No hay usuario seleccionado")
+        if not cmd:
             continue
 
-        await send(chat_activo["user_id"], msg)
+        # 🚪 salir
+        if cmd == "exit":
+            print("👋 Cerrando consola...")
+            break
 
-async def main():
-    print("💀 KHASAM MP CHAT")
+        # 👥 ver usuarios
+        elif cmd == "users":
+            mostrar_usuarios()
 
-    seleccionar_usuario()
-    await chat()
+        # 🎯 seleccionar usuario
+        elif cmd.startswith("select"):
+            partes = cmd.split()
 
+            if len(partes) < 2:
+                print("⚠️ Usa: select <id>")
+                continue
+
+            seleccionar(partes[1])
+
+        else:
+            partes = cmd.split()
+
+            # 🔥 modo rápido → ID mensaje
+            if partes[0].isdigit():
+                uid = partes[0]
+                mensaje = " ".join(partes[1:])
+
+                if not mensaje:
+                    print("⚠️ Escribe un mensaje")
+                    continue
+
+                await send(int(uid), mensaje)
+
+            # 💬 modo chat → usuario ya seleccionado
+            elif chat_activo["user_id"]:
+                await send(chat_activo["user_id"], cmd)
+
+            else:
+                print("⚠️ Usa 'select <id>' o escribe: <id> mensaje")
+
+# ▶️ ejecutar
 if __name__ == "__main__":
     asyncio.run(main())
