@@ -1,62 +1,61 @@
 import os
 import json
+import asyncio
 from datetime import datetime
 from telegram import Update
-from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
+from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters
 
-TOKEN = "8367475601:AAFt-z2bWkFY4W4ReGGVxKSkKtyWr4DkAUY"
-DATA_DIR = "data"
-HISTORIAL_FILE = os.path.join(DATA_DIR, "historial.json")
+TOKEN = "TU_TOKEN_AQUI"
+
+# Carpeta para historial
+DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 os.makedirs(DATA_DIR, exist_ok=True)
+HISTORIAL_FILE = os.path.join(DATA_DIR, "historial.json")
 
-def guardar_historial(user, uid, contenido, tipo):
+# Guardar mensaje en historial
+def guardar_historial(uid, username, mensaje, tipo="texto"):
     historial = []
     if os.path.exists(HISTORIAL_FILE):
         with open(HISTORIAL_FILE, "r") as f:
-            historial = json.load(f)
-    entrada = {
+            try:
+                historial = json.load(f)
+            except:
+                historial = []
+    historial.append({
         "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "user": user,
         "uid": uid,
-        "tipo": tipo,
-        "msg": contenido
-    }
-    historial.append(entrada)
+        "user": username,
+        "msg": mensaje,
+        "tipo": tipo
+    })
     with open(HISTORIAL_FILE, "w") as f:
-        json.dump(historial, f, indent=4)
+        json.dump(historial, f, indent=2)
 
-def detectar_contenido(msg):
-    if msg.text:
-        return msg.text, "texto"
-    elif msg.photo:
-        return "📷 Foto", "foto"
-    elif msg.video:
-        return "🎬 Video", "video"
-    elif msg.audio:
-        return "🎵 Audio", "audio"
-    elif msg.voice:
-        return "🎤 Voz", "voz"
-    elif msg.document:
-        return "📄 Archivo", "archivo"
-    elif msg.sticker:
-        return "😂 Sticker", "sticker"
-    else:
-        return "📦 Otro tipo", "otro"
+# Manejar mensajes recibidos
+async def mensaje_recibido(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = update.effective_user.id
+    username = update.effective_user.username or update.effective_user.full_name
+    texto = update.message.text if update.message else ""
+    guardar_historial(uid, username, texto, tipo="texto")
+    print(f"📩 {username} ({uid}) → {texto}")
 
-async def recibir(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message:
-        return
-    user = update.message.from_user
-    uid = user.id
-    name = user.username or user.first_name
-    contenido, tipo = detectar_contenido(update.message)
-    guardar_historial(name, uid, contenido, tipo)
-    print(f"[{name}] ({uid}) → {contenido} ({tipo})")
+# Manejar errores
+async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print(f"❌ ERROR: {context.error}")
 
+# Función principal
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
-    app.add_handler(MessageHandler(filters.ALL, recibir))
-    print("💀 BOT MP ACTIVO")
+
+    # Handler de mensajes
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, mensaje_recibido))
+    # Handler de errores
+    app.add_error_handler(error_handler)
+
+    print("💀 BOT ACTIVADO")
+    print("Esperando mensajes...")
+
+    # Run polling sin conflictos
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
